@@ -1,107 +1,118 @@
-## Setting up Email Notifications for EBS Tag Changes
+### **Monitoring EBS Tag Changes with AWS CloudWatch, Lambda, and SNS**
 
-### **Objective:**
-The goal of this setup is to notify administrators via email whenever tags are added, modified, or deleted on Amazon Elastic Block Store (EBS) volumes using AWS CloudWatch Events, Lambda, and SNS.
-
-### **Use Case:**
-An organization needs to monitor changes to the tags of its EBS volumes to ensure accurate resource management, cost tracking, and compliance. The administrators want to receive immediate email alerts whenever a tag is created, modified, or deleted on EBS volumes in the AWS environment.
+This document outlines the steps to monitor Amazon Elastic Block Store (EBS) tag changes using AWS CloudWatch, Lambda, and SNS. It includes step-by-step instructions, use cases, and the benefits of implementing this solution.
 
 ---
 
-### **Overview of the Solution:**
+## **1. Overview**
 
-1. **CloudWatch Events (EventBridge)** will be used to capture the API calls related to EBS tag changes (`CreateTags`, `DeleteTags`, `ModifyTags`).
-2. **AWS Lambda** will process the event and publish the information to an **SNS topic**.
-3. **Amazon SNS (Simple Notification Service)** will send email notifications to subscribed users.
+Amazon EBS is a scalable storage service for EC2 instances. Tracking changes to EBS tags is essential for maintaining compliance, auditing changes, and ensuring proper resource management. To monitor EBS tag changes, we can use **AWS CloudTrail** to log API calls, **AWS EventBridge** (formerly CloudWatch Events) to detect changes, and **AWS Lambda** to trigger notifications through **SNS (Simple Notification Service)**.
 
 ---
 
-### **Step 1: Setting up CloudWatch Events (EventBridge)**
+## **2. Use Case**
 
-1. **Go to EventBridge:**
-   - In the AWS Management Console, navigate to **Amazon EventBridge**.
-   - Click on **Rules** in the left sidebar, then click **Create rule**.
+### **Scenario:**
+An organization wants to receive email notifications when EBS tags are modified, created, or deleted. This could be useful for:
+- **Security Audits:** Ensure that changes to EBS tags (which may reflect sensitive information or resource categorization) are logged.
+- **Compliance Monitoring:** Monitor the usage and changes of EBS tags to stay compliant with internal or regulatory standards.
+- **Resource Management:** Keep track of changes to tags used for billing, resource categorization, or ownership.
 
-2. **Create Event Pattern:**
-   - In the **Create Rule** screen, under **Define pattern**, select **Event source** as **AWS events or EventBridge default event bus**.
-   - In **Event Pattern**, select the **AWS service** as the event source, and set it to **EC2**.
-   - Set the **Event Type** to **AWS API Call via CloudTrail**. This will allow us to capture API calls such as tag modifications.
-
-3. **Configure Event Pattern:**
-   - Select **Specific event(s)** and configure the event pattern to look for the EBS tag-related events.
-   - The event names you’re interested in are `CreateTags`, `DeleteTags`, and `ModifyTags`:
-
-
-4. **Select Target for the Rule:**
-   - Under **Select targets**, choose **Lambda function**. You’ll later specify the Lambda function that will handle the event and trigger the email notification.
+### **Benefits:**
+- **Security & Compliance:** Ensures that any unauthorized or untracked changes to EBS tags are detected.
+- **Automation:** Automatically send notifications without manual monitoring.
+- **Auditing:** Provides a record of who made changes to tags and when they were made.
 
 ---
 
-### **Step 2: Create an SNS Topic**
+## **3. Architecture Overview**
 
-1. **Go to Amazon SNS:**
-   - In the AWS Management Console, navigate to **Simple Notification Service (SNS)**.
-   - Click **Create topic**.
+### **Components:**
+- **AWS CloudTrail:** Tracks the API calls related to EBS tag changes.
+- **AWS EventBridge (CloudWatch Events):** Detects the changes based on CloudTrail logs.
+- **AWS Lambda:** Processes the event and sends notifications.
+- **SNS (Simple Notification Service):** Sends email alerts to specified recipients.
 
-2. **Create Topic:**
-   - Choose **Standard** as the topic type.
-   - Enter a **Topic Name** (e.g., `EBS-Tag-Change-Notifications`).
-   - Click **Create topic**.
+---
 
-3. **Subscribe to Topic:**
-   - Once the topic is created, click on the topic ARN (Amazon Resource Name).
-   - In the **Subscriptions** section, click **Create subscription**.
-   - For **Protocol**, select **Email**.
-   - Enter the email address to receive notifications and click **Create subscription**.
-   - A confirmation email will be sent to the specified email address. Click the confirmation link to subscribe.
+## **4. Detailed Steps**
+
+### **Step 1: Enable CloudTrail to Capture EBS Events**
+
+Before proceeding with the notification setup, you must ensure that **CloudTrail** is enabled to capture the necessary events, such as creating, modifying, or deleting EBS tags.
+
+1. Go to the **CloudTrail** service in the AWS Management Console.
+2. If you don’t already have a trail set up, create a new trail.
+3. Under the **Management Events** section, ensure that **Read/Write Events** is set to capture **All Events** or at least **Write-only Events**.
+4. CloudTrail will log API calls such as `CreateTags`, `DeleteTags`, and `ModifyTags` related to EBS volumes.
+
+---
+
+### **Step 2: Create an EventBridge Rule**
+
+Next, you'll set up an EventBridge rule to listen for tag changes on EBS volumes.
+
+1. Go to **Amazon EventBridge** in the AWS Management Console.
+2. Click on **Create Rule**.
+3. Define the event pattern to capture specific API calls related to tag changes:
+   - Select **Event Source**: `AWS API Call via CloudTrail`.
+   - Set **Service Name** as `EC2`.
+   - Choose **Event Name** as `CreateTags`, `DeleteTags`, or `ModifyTags`.
+4. Example event pattern (this pattern captures changes to tags on EBS resources):
+
+5. For the target, select **Lambda Function** and choose the Lambda function you will create in the next step.
 
 ---
 
 ### **Step 3: Create a Lambda Function**
 
-1. **Go to AWS Lambda:**
-   - In the AWS Management Console, navigate to **Lambda**.
-   - Click **Create function**.
+Now, you need to create a Lambda function that will process the event and send notifications.
 
-2. **Create Lambda Function:**
-   - Choose **Author from scratch**.
-   - Enter a function name, such as `EBSTagChangeNotificationFunction`.
-   - Choose a runtime (Python, Node.js, etc.). Here, we use Python 3.x.
-   - Set the **Execution role** to **Create a new role with basic Lambda permissions**.
+1. Go to **AWS Lambda** in the AWS Management Console and click **Create function**.
+2. Select **Author from scratch** and choose a runtime (Python or Node.js).
+3. In the function code editor, paste the following code:
 
-3. **Write Lambda Function Code:**
-   - Below is the Python code to process the event, extract information, and publish it to the SNS topic.
+#### **Explanation:**
+- **Logging the event**: `print(f"Received event: {json.dumps(event)}")` logs the event for debugging.
+- **Extracting data**: The code uses `event.get('detail', {})` to extract the event details safely. If the key doesn't exist, it defaults to an empty dictionary.
+- **Message formatting**: The code prepares a message using details like `resources`, `eventName`, and `userIdentity`.
+- **Sending notification**: The `sns_client.publish` function sends the formatted message to the SNS topic.
 
-4. **Deploy the Lambda Function:**
-   - After writing the code, click **Deploy**.
+4. Replace the `TopicArn` with the ARN of your SNS topic (explained in the next step).
 
 ---
 
-### **Step 4: Set Lambda Permissions**
+### **Step 4: Create an SNS Topic**
 
-- Make sure the Lambda function has the necessary permissions to publish messages to the SNS topic.
-- Attach the following **IAM policy** to the Lambda execution role (or use a managed policy like `SNSPublish`):
+Next, you'll create an SNS topic and subscribe to it.
 
----
-
-### **Step 5: Link Lambda Function to EventBridge Rule**
-
-1. **Go back to the EventBridge Rule** (the rule you created in Step 1).
-2. **Add the Lambda Function as the Target**:
-   - In the **Target** section, choose **Lambda function** and select the Lambda function created earlier.
-   - Save the rule.
+1. Go to **Amazon SNS** in the AWS Management Console.
+2. Click on **Create topic**, choose **Standard** as the type, and give it a name like `EBS-Tag-Change-Notifications`.
+3. After the topic is created, click on **Create subscription**.
+4. Choose **Email** as the protocol and provide your email address to receive notifications.
+5. Check your email inbox and confirm the subscription by clicking the confirmation link.
 
 ---
 
-### **Step 6: Test the Setup**
+### **Step 5: Attach Permissions to Lambda**
 
-1. **Modify Tags on EBS Volumes:**
-   - To test, modify, create, or delete tags on any EBS volume in your AWS environment.
-   
-2. **Check the Email:**
-   - The Lambda function should trigger when the tags are modified, and the SNS topic will send an email notification to the subscribed email address.
+Ensure that your Lambda function has permission to publish to the SNS topic. To do this:
 
-3. **Verify Logs and Notification:**
-   - Check the CloudWatch logs for the Lambda function to verify that it’s being triggered and handling the event correctly.
-   - Confirm that you received the email notification with the correct information about the EBS tag change.
+1. Go to the **IAM** role that Lambda uses (which is created automatically when you create the Lambda function).
+2. Attach the policy `AmazonSNSFullAccess` or create a custom policy allowing `sns:Publish` to your SNS topic ARN.
 
+---
+
+### **Step 6: Testing the Setup**
+
+1. Modify or delete a tag on an EBS volume. You can do this through the **EC2 Console** by selecting an EBS volume, going to the **Tags** tab, and adding/removing tags.
+2. This will trigger the EventBridge rule and the Lambda function will be executed.
+3. Check your email for the notification about the tag change.
+
+---
+
+### **Summary of Key Benefits:**
+- **Enhanced Security and Auditing**: Monitoring EBS tag changes helps you track who made modifications, which can be crucial for security audits and compliance.
+- **Automation**: This solution removes the need for manual monitoring and ensures automatic notifications when tag changes occur.
+- **Improved Resource Management**: By tracking tag modifications, you can ensure that your resources are correctly categorized, and that any changes to billing or ownership tags are promptly reviewed.
+- **Scalability**: You can apply this monitoring solution to any number of EBS volumes in your AWS environment, making it scalable for large infrastructures.
