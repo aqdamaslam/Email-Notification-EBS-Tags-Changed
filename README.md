@@ -108,7 +108,6 @@ Ensure that your Lambda function has permission to publish to the SNS topic. To 
 1. Modify or delete a tag on an EBS volume. You can do this through the **EC2 Console** by selecting an EBS volume, going to the **Tags** tab, and adding/removing tags.
 2. This will trigger the EventBridge rule and the Lambda function will be executed.
 3. Check your email for the notification about the tag change.
-
 ---
 
 ### **Summary of Key Benefits:**
