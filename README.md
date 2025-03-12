@@ -15,7 +15,7 @@ Amazon EBS is a scalable storage service for EC2 instances. Tracking changes to 
 ### **Scenario:**
 An organization wants to receive email notifications when EBS tags are modified, created, or deleted. This could be useful for:
 - **Security Audits:** Ensure that changes to EBS tags (which may reflect sensitive information or resource categorization) are logged.
-- **Compliance Monitoring:** Monitor the usage and changes of EBS tags to stay compliant with internal or regulatory standards.
+- **Compliance Monitoring:** Monitor the usage and changes of EBS tags to stay compliant with internal or regulatory standards. 
 - **Resource Management:** Keep track of changes to tags used for billing, resource categorization, or ownership.
 
 ### **Benefits:**
